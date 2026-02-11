@@ -5,12 +5,21 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+    - 
 - What classes did you include, and what responsibilities did you assign to each?
-
+    - Owner - Should hold a list of their pets and their own scheduler so the app can schedule multiple people. Collect basic information from the Owner. Let the Owner be able to CURD their list of pets as well as tasks on their scheduler. 
+    Pet - Should include the basic info for the pet.
+    Scheduler - Creates the plan by collecting the information from the other components 
+    Task - Creates a time block of the  routine of the owner/pet -- feedings, walks, medications, and appointments 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Three core actions:
+- Create a profile for the user and their pets (CURD Operations for pets) 
+- Display today's tasks in order of priority and explain why 
+- Allow the pet to have routines: going for a walk, getting cleaned, etc. 
 
 ---
 
