@@ -154,6 +154,7 @@ class Scheduler:
 	def __init__(self, rules: Optional[Dict[str, Callable]] = None) -> None:
 		"""Initialize the scheduler with optional rules."""
 		self.rules = rules or {}
+		self.last_warnings: List[str] = []
 
 	def add_rule(self, name: str, rule_fn: Callable) -> None:
 		"""Register a scheduling rule."""
@@ -166,6 +167,34 @@ class Scheduler:
 		for pet in owner.pets:
 			tasks.extend(getattr(pet, "tasks", []))
 		return tasks
+
+	def filter_tasks(
+		self,
+		tasks: List[Task],
+		completed: Optional[bool] = None,
+		pet_name: Optional[str] = None,
+		owner: Optional[Owner] = None,
+		pets: Optional[List[Pet]] = None,
+	) -> List[Task]:
+		"""Filter tasks by completion status and/or pet name.
+
+		If pet_name is provided, tasks are matched using owner/pets info.
+		"""
+		filtered = tasks
+
+		if completed is not None:
+			filtered = [task for task in filtered if task.completed is completed]
+
+		if pet_name:
+			pet_pool = pets or (owner.pets if owner else [])
+			pet_name_lower = pet_name.strip().lower()
+			pet_ids = {
+				pet.id for pet in pet_pool
+				if pet.id is not None and pet.name.strip().lower() == pet_name_lower
+			}
+			filtered = [task for task in filtered if task.pet_id in pet_ids] if pet_ids else []
+
+		return filtered
 
 	def schedule_tasks(
 		self,
@@ -204,16 +233,7 @@ class Scheduler:
 						except Exception:
 							pass
 
-		# key function for sorting
-		def priority_key(t: Task):
-			try:
-				p = t.priority if isinstance(t.priority, Priority) else Priority(str(t.priority))
-			except Exception:
-				p = Priority.MEDIUM
-			order = {Priority.HIGH: 0, Priority.MEDIUM: 1, Priority.LOW: 2}
-			return (order.get(p, 1), -int(t.duration_minutes))
-
-		tasks_sorted = sorted(tasks, key=priority_key)
+		tasks_sorted = self.sort_by_time(tasks)
 
 		scheduled: List[ScheduledTask] = []
 		cursor = start_time
@@ -231,7 +251,136 @@ class Scheduler:
 			if st >= cursor:
 				cursor = et
 
+		self.last_warnings = self.detect_conflicts(scheduled, owner=owner)
 		return scheduled
+
+	def sort_by_time(self, tasks: List[Task]) -> List[Task]:
+		"""Return tasks sorted by scheduled time, then unscheduled tasks.
+
+		Unscheduled tasks are ordered after all timed tasks.
+		"""
+		def scheduled_time_key(t: Task):
+			has_time = t.scheduled_time is not None
+			return (not has_time, t.scheduled_time or datetime.max)
+
+		return sorted(tasks, key=scheduled_time_key)
+
+	def detect_conflicts(
+		self,
+		scheduled: List[ScheduledTask],
+		owner: Optional[Owner] = None,
+	) -> List[str]:
+		"""Return non-blocking warning messages for scheduling conflicts.
+
+		Checks overlaps, same-start collisions, invalid durations, and availability.
+		"""
+		warnings: List[str] = []
+		if not scheduled:
+			return warnings
+
+		ordered = sorted(scheduled, key=lambda s: s.start_time)
+		previous = ordered[0]
+		for current in ordered[1:]:
+			if current.start_time < previous.end_time:
+				warnings.append(
+					f"Overlap: '{current.task.title}' starts at {current.start_time.strftime('%H:%M')} "
+					f"before '{previous.task.title}' ends at {previous.end_time.strftime('%H:%M')}."
+				)
+			previous = current
+
+		by_start: Dict[datetime, List[ScheduledTask]] = {}
+		for s in scheduled:
+			by_start.setdefault(s.start_time, []).append(s)
+		for start, group in by_start.items():
+			if len(group) > 1:
+				titles = ", ".join(sorted(task.task.title for task in group))
+				warnings.append(
+					f"Collision: multiple tasks start at {start.strftime('%H:%M')}: {titles}."
+				)
+
+		for s in scheduled:
+			if s.end_time <= s.start_time:
+				warnings.append(
+					f"Invalid duration: '{s.task.title}' ends at {s.end_time.strftime('%H:%M')} "
+					f"which is not after {s.start_time.strftime('%H:%M')}."
+				)
+
+		if owner:
+			av = owner.get_availability() or {}
+			date_base = ordered[0].start_time.date()
+			start_bound = None
+			end_bound = None
+			if isinstance(av.get("start"), str):
+				try:
+					h, m = map(int, av["start"].split(":"))
+					start_bound = datetime.combine(date_base, time(hour=h, minute=m))
+				except Exception:
+					start_bound = None
+			if isinstance(av.get("end"), str):
+				try:
+					h, m = map(int, av["end"].split(":"))
+					end_bound = datetime.combine(date_base, time(hour=h, minute=m))
+				except Exception:
+					end_bound = None
+
+			for s in scheduled:
+				if start_bound and s.start_time < start_bound:
+					warnings.append(
+						f"Outside availability: '{s.task.title}' starts at {s.start_time.strftime('%H:%M')} "
+						f"before availability starts at {start_bound.strftime('%H:%M')}."
+					)
+				if end_bound and s.end_time > end_bound:
+					warnings.append(
+						f"Outside availability: '{s.task.title}' ends at {s.end_time.strftime('%H:%M')} "
+						f"after availability ends at {end_bound.strftime('%H:%M')}."
+					)
+
+		return warnings
+
+	def complete_task(
+		self,
+		task: Task,
+		owner: Optional[Owner] = None,
+		pets: Optional[List[Pet]] = None,
+	) -> Optional[Task]:
+		"""Mark a task complete and create the next recurring instance if needed.
+
+		Returns the newly created task for daily/weekly recurrences.
+		"""
+		task.mark_complete()
+		if not task.is_recurring():
+			return None
+
+		next_time = task.next_occurrence()
+		if not next_time:
+			return None
+
+		new_task = Task(
+			id=None,
+			title=task.title,
+			duration_minutes=task.duration_minutes,
+			priority=task.priority,
+			owner_id=task.owner_id,
+			pet_id=task.pet_id,
+			notes=task.notes,
+			description=task.description,
+			scheduled_time=next_time,
+			recurrence=task.recurrence,
+			completed=False,
+		)
+
+		pet_pool = pets or (owner.pets if owner else [])
+		if task.pet_id is not None:
+			for pet in pet_pool:
+				if pet.id == task.pet_id:
+					pet.add_task(new_task)
+					return new_task
+			return new_task
+
+		if owner:
+			owner.add_task(new_task)
+
+		return new_task
 
 	def explain_schedule(self, scheduled: List[ScheduledTask]) -> List[str]:
 		"""Return human-readable schedule explanations."""

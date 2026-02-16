@@ -39,6 +39,7 @@ Three core actions:
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
 
+- It prioritizes chronological ordering by scheduled_time, which can create overlaps rather than resolving them. This keeps the logic simple and predictable, but may schedule conflicts instead of auto-adjusting tasks.
 ---
 
 ## 3. AI Collaboration

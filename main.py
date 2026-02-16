@@ -17,16 +17,20 @@ def build_demo_data() -> tuple[Owner, Scheduler]:
 	owner.add_pet(dog)
 	owner.add_pet(cat)
 
-	# three tasks with different times/priorities
+	# three tasks with different times/priorities (added out of order)
 	now = datetime.now().replace(second=0, microsecond=0)
-
-	walk = Task(id=101, title="Morning Walk", duration_minutes=30, priority=Priority.HIGH)
-	walk.scheduled_time = now.replace(hour=8, minute=0)
-	dog.add_task(walk)
 
 	feed = Task(id=102, title="Feed Pets", duration_minutes=15, priority=Priority.MEDIUM)
 	feed.scheduled_time = now.replace(hour=12, minute=0)
 	owner.add_task(feed)  # owner-level task
+
+	groom = Task(id=104, title="Grooming", duration_minutes=20, priority=Priority.LOW)
+	groom.scheduled_time = now.replace(hour=12, minute=0)
+	cat.add_task(groom)
+
+	walk = Task(id=101, title="Morning Walk", duration_minutes=30, priority=Priority.HIGH)
+	walk.scheduled_time = now.replace(hour=8, minute=0)
+	dog.add_task(walk)
 
 	meds = Task(id=103, title="Give Medication", duration_minutes=5, priority=Priority.HIGH)
 	# leave meds unscheduled so scheduler will place it after scheduled tasks
@@ -43,6 +47,10 @@ def print_schedule(owner: Owner, scheduler: Scheduler) -> None:
 		start = s.start_time.strftime("%Y-%m-%d %H:%M")
 		end = s.end_time.strftime("%H:%M")
 		print(f"- {start} to {end}: {s.task.title} (pet_id={s.task.pet_id}, priority={s.task.priority})")
+	if scheduler.last_warnings:
+		print("Warnings:")
+		for warning in scheduler.last_warnings:
+			print(f"- {warning}")
 
 
 if __name__ == "__main__":
