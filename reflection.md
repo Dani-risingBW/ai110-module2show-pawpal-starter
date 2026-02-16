@@ -47,12 +47,14 @@ Three core actions:
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
+    - I used the AI tools for the whole process from brainstorming, programming, debugging, and the finishing touches. The whole project was to use AI tools so I utilized copilot to promote AI to create the logic.
 - What kinds of prompts or questions were most helpful?
-
+    - More detailed prompts helped you get the fastest results. I also used prompts similar from the assignment to make sure I was on task. 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
+    AI suggests are wrong sometimes and you notice it when after editting it will explain what it did. Sometimes I would ask for further elaboration, then if it didn't match the outcome of all that I wanted to do. 
 
 ---
 
@@ -62,12 +64,13 @@ Three core actions:
 
 - What behaviors did you test?
 - Why were these tests important?
+    - Although it didn't ask, I tested integration because there were a lot of new methods that may not have flowed seamlessly with the UI. These tests revealed that there were integration errors before I safely ran streamlit. 
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
-
+    - I am still 4/5 because I may have been a bit ambitious when it came to the logic and I still dont have all the logic fully integrated. There are some behind the scenes logic that haven't been displayed onto the website correctly. 
 ---
 
 ## 5. Reflection

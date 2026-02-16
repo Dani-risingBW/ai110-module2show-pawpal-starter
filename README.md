@@ -51,6 +51,27 @@ Recent improvements make the scheduler more helpful and safer:
 - Recurring task rollover with `Scheduler.complete_task()` for daily/weekly tasks.
 - Non-blocking conflict detection with `Scheduler.detect_conflicts()`, surfaced as warnings.
 
+## Features
+
+- Sorting by scheduled time (timed tasks first, then unscheduled tasks).
+- Default start time with availability override for owner preferences.
+- Sequential placement of unscheduled tasks after timed tasks.
+- Conflict warnings for overlaps, same-start collisions, and availability bounds.
+- Daily/weekly recurrence rollover when completing tasks.
+- Task filtering by completion status and pet name.
+
+## Testing PawPal+
+
+Run the test suite with:
+
+```bash
+python -m pytest
+```
+
+These tests cover task completion, pet task assignment, scheduling defaults and availability, mixed scheduled vs unscheduled ordering, conflicts, availability warnings, and recurring task rollovers.
+
+Confidence Level: 4/5 stars based on 13/13 passing unit tests (logic-focused coverage).
+
 ## UML Diagrams
 
 See the UML diagrams and DB schema in [UML.md](UML.md)

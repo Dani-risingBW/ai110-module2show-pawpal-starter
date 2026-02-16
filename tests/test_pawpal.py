@@ -7,6 +7,7 @@ from datetime import datetime, date, time, timedelta
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from pawpal_system import Pet, Task, Priority, Owner, Scheduler
+from streamlit.testing.v1 import AppTest
 
 def test_mark_complete_changes_task_status():
     """Verify that calling mark_complete() changes the task's status to complete."""
@@ -196,3 +197,54 @@ def test_recurring_task_without_scheduled_time_returns_none():
     new_task = scheduler.complete_task(task)
     assert new_task is None
     assert task.completed is True
+
+def _widget_by_label(widgets, label):
+    for widget in widgets:
+        if getattr(widget, "label", None) == label:
+            return widget
+    raise KeyError(label)
+
+def test_app_initial_state_shows_no_tasks_info():
+    """Verify app initial state shows no tasks info."""
+    app_path = Path(__file__).parent.parent / "app.py"
+    at = AppTest.from_file(str(app_path)).run()
+    info_texts = [info.value for info in at.info]
+    assert any("No tasks yet. Add one above." in text for text in info_texts)
+    assert len(at.table) == 0
+
+def test_app_add_task_shows_task_table():
+    """Verify app adds task to table."""
+    app_path = Path(__file__).parent.parent / "app.py"
+    at = AppTest.from_file(str(app_path)).run()
+    _widget_by_label(at.text_input, "Task title").set_value("Evening walk")
+    _widget_by_label(at.number_input, "Duration (minutes)").set_value(25)
+    _widget_by_label(at.selectbox, "Priority").select("high")
+    _widget_by_label(at.button, "Add task").click()
+    at.run(timeout=10)
+    assert len(at.table) >= 1
+    table_text = _table_text(at.table[0])
+    assert "Evening walk" in table_text
+
+def test_app_generate_schedule_adds_schedule_table():
+    """Verify app generates schedule table."""
+    app_path = Path(__file__).parent.parent / "app.py"
+    at = AppTest.from_file(str(app_path)).run()
+    _widget_by_label(at.text_input, "Task title").set_value("Check water")
+    _widget_by_label(at.number_input, "Duration (minutes)").set_value(10)
+    _widget_by_label(at.selectbox, "Priority").select("medium")
+    _widget_by_label(at.button, "Add task").click()
+    at.run(timeout=10)
+    _widget_by_label(at.button, "Generate schedule").click()
+    at.run(timeout=10)
+    assert len(at.table) >= 2
+    schedule_text = _table_text(at.table[-1])
+    assert "Check water" in schedule_text
+
+def _table_text(table) -> str:
+    data = getattr(table, "data", getattr(table, "value", None))
+    if data is None:
+        return ""
+    try:
+        return data.to_string()
+    except Exception:
+        return str(data)
